@@ -8,12 +8,20 @@
   const configured = Boolean(cfg.supabaseUrl && cfg.publishableKey && window.supabase?.createClient);
   let client;
   let user = null;
+  let recoveryMode = false;
   let saveTimer = 0;
   let updatingLocalCopy = false;
   let readyResolve;
   window.portfolioCloudReady = new Promise((resolve) => { readyResolve = resolve; });
   window.portfolioCloud = {
     enabled: configured,
+    get recoveryMode() { return recoveryMode; },
+    async updatePassword(password) {
+      if (!configured) throw new Error('Shared editing is not configured.');
+      const { error } = await client.auth.updateUser({ password });
+      if (error) throw new Error(error.message || 'Could not update the password.');
+      recoveryMode = false;
+    },
     async signIn(password) {
       if (!configured) throw new Error('Shared editing is not configured yet. Add the Supabase project URL and publishable key first.');
       const { data, error } = await client.auth.signInWithPassword({ email: cfg.ownerEmail, password });
@@ -88,6 +96,12 @@
   if (configured) {
     client = window.supabase.createClient(cfg.supabaseUrl, cfg.publishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    client.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        recoveryMode = true;
+        window.dispatchEvent(new Event('portfolio-password-recovery'));
+      }
     });
     Promise.all([
       client.auth.getSession().then(({ data }) => { user = data.session?.user || null; }),

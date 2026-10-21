@@ -1406,6 +1406,18 @@
         </form>
       </div>
     </dialog>
+    <dialog class="about-edit-dialog" id="password-recovery-dialog" aria-labelledby="password-recovery-title">
+      <h2 id="password-recovery-title">Set a new owner password</h2>
+      <p>Choose a new password for your portfolio owner account.</p>
+      <form id="password-recovery-form">
+        <label for="recovery-new-password">New password</label>
+        <input class="about-password" id="recovery-new-password" type="password" autocomplete="new-password" minlength="8" required>
+        <label for="recovery-confirm-password">Confirm new password</label>
+        <input class="about-password" id="recovery-confirm-password" type="password" autocomplete="new-password" minlength="8" required>
+        <p id="password-recovery-error" role="alert" hidden></p>
+        <div class="about-edit-actions"><button type="submit">Save new password</button></div>
+      </form>
+    </dialog>
   </div>
   <script src="about-content.js"></script>
   <script src="specialization-content.js"></script>
@@ -1423,6 +1435,38 @@
   <script>
     (async () => {
       if (window.portfolioCloudReady) await window.portfolioCloudReady;
+      const recoveryDialog = document.getElementById('password-recovery-dialog');
+      const recoveryForm = document.getElementById('password-recovery-form');
+      const recoveryError = document.getElementById('password-recovery-error');
+      const showRecoveryForm = () => {
+        if (window.portfolioCloud?.recoveryMode && !recoveryDialog.open) recoveryDialog.showModal();
+      };
+      window.addEventListener('portfolio-password-recovery', showRecoveryForm);
+      showRecoveryForm();
+      recoveryForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        recoveryError.hidden = true;
+        const password = document.getElementById('recovery-new-password').value;
+        const confirmation = document.getElementById('recovery-confirm-password').value;
+        if (password !== confirmation) {
+          recoveryError.textContent = 'The passwords do not match.';
+          recoveryError.hidden = false;
+          return;
+        }
+        const submit = recoveryForm.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        try {
+          await window.portfolioCloud.updatePassword(password);
+          recoveryDialog.close();
+          recoveryForm.reset();
+          alert('Your owner password has been updated. Return to the portfolio and sign in with the new password.');
+        } catch (error) {
+          recoveryError.textContent = error.message || 'Could not update the password. Please request a new recovery link.';
+          recoveryError.hidden = false;
+        } finally {
+          submit.disabled = false;
+        }
+      });
       const storageGet = (key) => { try { return localStorage.getItem(key); } catch (_) { return null; } };
       const storageSet = (key, value) => { try { localStorage.setItem(key, value); return true; } catch (_) { return false; } };
       const about = window.PORTFOLIO_ABOUT;
